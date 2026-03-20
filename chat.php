@@ -2,8 +2,44 @@
 // public/chat.php
 
 // ---- config ----
-// Prefer environment variable in production
-$apiKey = getenv("OPENAI_API_KEY");
+// Simple .env loader for local development.
+
+function loadEnvValue(string $key, ?string $filePath = null): ?string {
+  $filePath = $filePath ?? __DIR__ . '/.env';
+  if (!is_readable($filePath)) {
+    return null;
+  }
+
+  $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  if ($lines === false) {
+    return null;
+  }
+
+  foreach ($lines as $line) {
+    $line = trim($line);
+    if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+      continue;
+    }
+
+    [$k, $value] = explode('=', $line, 2);
+    $k = trim($k);
+    if ($k !== $key) {
+      continue;
+    }
+
+    $value = trim($value);
+    $value = trim($value, "'\""); // strip simple quotes
+    putenv("$k=$value");
+    $_ENV[$k] = $value;
+    $_SERVER[$k] = $value;
+    return $value;
+  }
+
+  return null;
+}
+
+// Prefer environment variable in production, but allow .env fallback locally.
+$apiKey = getenv("OPENAI_API_KEY") ?: loadEnvValue("OPENAI_API_KEY");
 if (!$apiKey) {
   http_response_code(500);
   header("Content-Type: text/plain");
