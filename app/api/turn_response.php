@@ -1,8 +1,12 @@
 <?php
 // public/api/turn_response.php
-require_once dirname(__DIR__, 2) . '/includes/config.php';
-require_once dirname(__DIR__, 2) . '/../includes/openai.php';
-require_once dirname(__DIR__, 2) . '/includes/tools.php';
+// require_once dirname(__DIR__, 2) . '/includes/config.php';
+// require_once dirname(__DIR__, 2) . '/../includes/openai.php';
+// require_once dirname(__DIR__, 2) . '/includes/tools.php';
+
+require_once __DIR__ . '/../../config_response_starter.php';
+require_once __DIR__ . '/../includes/openai.php';
+require_once __DIR__ . '/../includes/tools.php';
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -10,10 +14,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Method Not Allowed');
 }
 
-// Read JSON body (like file_get_contents('php://input') — your old friend)
+// Read JSON body 
 $input = json_decode(file_get_contents('php://input'), true);
 $messages = $input['messages'] ?? [];
 $toolsState = $input['toolsState'] ?? [];
+
+// Keep a simple log of the incoming JSON just before we stream a response.
+$logFile  = __DIR__ . '/turn_response.log';
+$logEntry = sprintf("[%s] %s\n",
+    date('c'),
+    json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+);
+file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
 
 // Build the tools array based on what the user has toggled on
 $tools = buildTools($toolsState);
