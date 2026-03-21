@@ -1,0 +1,21 @@
+# public/.htaccess
+
+# Enable mod_rewrite
+RewriteEngine On
+
+# If you want clean URLs (optional — /api/turn_response instead of /api/turn_response.php)
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^api/(.*)$ api/$1.php [L,QSA]
+
+# Disable output buffering for SSE endpoint
+<Files "turn_response.php">
+    # Ensure Apache doesn't buffer the SSE stream
+    SetEnv no-gzip 1
+    SetEnv dont-vary 1
+</Files>
+
+# Block access to .env files
+<Files ".env">
+    Require all denied
+</Files>
