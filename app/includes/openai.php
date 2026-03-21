@@ -32,6 +32,7 @@ function openai_responses_create(array $params): array {
  */
 function openai_responses_stream(array $params, callable $onEvent): void {
     $params['stream'] = true;
+    $buffer = '';
 
     $ch = curl_init('https://api.openai.com/v1/responses');
     curl_setopt_array($ch, [
@@ -44,8 +45,10 @@ function openai_responses_stream(array $params, callable $onEvent): void {
         CURLOPT_RETURNTRANSFER => false,  // Don't buffer — stream it
         CURLOPT_TIMEOUT => 300,
         // This callback fires for each chunk received from OpenAI
-        CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use ($onEvent) {
-            $lines = explode("\n", $chunk);
+        CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$buffer, $onEvent) {
+            $buffer .= $chunk;
+            $lines = explode("\n", $buffer);
+            $buffer = array_pop($lines);
             foreach ($lines as $line) {
                 $line = trim($line);
                 if ($line === '' || $line === 'data: [DONE]') continue;
