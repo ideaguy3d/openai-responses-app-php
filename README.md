@@ -1,4 +1,4 @@
-# Converting to Native PHP + Vanilla JS on LAMP (No Frameworks)
+# Converting `github.com/ideaguy3d/openai-responses-app` to Native PHP + Vanilla JS on LAMP (No Frameworks)
 
 Your stack: **Linux, Apache, MySQL (if needed), PHP, vanilla JavaScript, Tailwind CSS.**
 
