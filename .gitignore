@@ -183,3 +183,4 @@ cython_debug/
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+.DS_Store
