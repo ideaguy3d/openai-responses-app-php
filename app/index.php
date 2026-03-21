@@ -1,5 +1,11 @@
 <?php
+
 // public/index.php
+
+require_once __DIR__ . '/../config_response_starter.php';
+// require_once __DIR__ . '/includes/openai.php';
+// require_once __DIR__ . '/includes/tools.php';
+
 session_start();
 
 // Initialize session data if not set
@@ -21,17 +27,20 @@ if (!isset($_SESSION['tools'])) {
 ?>
 
 
-<?php include dirname(__DIR__) . '/templates/header.php'; ?>
+<?php 
+    // include dirname(__DIR__) . '/templates/header.php'; 
+    include __DIR__ . '/templates/header.php'; 
+?>
 
 <div class="flex justify-center h-screen">
     <!-- Chat area (70%) -->
     <div class="w-full md:w-[70%]">
-        <?php include dirname(__DIR__) . '/templates/chat.php'; ?>
+        <?php include __DIR__ . '/templates/chat.php'; ?>
     </div>
     <!-- Tools panel (30%) -->
     <div class="hidden md:block w-[30%]">
-        <?php include dirname(__DIR__) . '/templates/tools-panel.php'; ?>
+        <?php include __DIR__ . '/templates/tools-panel.php'; ?>
     </div>
 </div>
 
-<?php include dirname(__DIR__) . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/templates/footer.php'; ?>

@@ -1,7 +1,7 @@
 <?php
 
 // Load .env file (simple parser, no framework needed)
-$envFile = dirname(__DIR__) . '/.env';
+$envFile = __DIR__ . '/.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -10,6 +10,9 @@ if (file_exists($envFile)) {
         [$key, $value] = explode('=', $line, 2);
         $_ENV[trim($key)] = trim($value);
     }
+}
+else {
+    exit('cannot find .env'); 
 }
 
 define('OPENAI_API_KEY', getenv('OPENAI_API_KEY'));
