@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Responses Starter App</title>
-    <link rel="icon" href="/images/openai_logo.svg">
+    <link rel="icon" href="<?= APP_BASE_PATH ?>/images/openai_logo.svg">
 
-    <!-- <link rel="stylesheet" href="/css/styles.css"> -->
+    <!-- <link rel="stylesheet" href="<?= APP_BASE_PATH ?>/css/styles.css"> -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 

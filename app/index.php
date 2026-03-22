@@ -3,10 +3,14 @@
 // public/index.php
 
 require_once __DIR__ . '/../config_response_starter.php';
-// require_once __DIR__ . '/includes/openai.php';
-// require_once __DIR__ . '/includes/tools.php';
 
 session_start();
+
+$appBasePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+if ($appBasePath === '/' || $appBasePath === '.') {
+    $appBasePath = '';
+}
+define('APP_BASE_PATH', $appBasePath);
 
 // Initialize session data if not set
 if (!isset($_SESSION['messages'])) {

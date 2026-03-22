@@ -205,7 +205,7 @@
       <div class="mt-1 tool-sub-panel" data-panel-for="googleIntegrationEnabled" style="display:none;">
         <!-- Google connection status (populated by JS on page load) -->
         <div id="google-not-connected" style="display:none;">
-          <a href="/api/google/auth.php">
+          <a href="<?= APP_BASE_PATH ?>/api/google/auth.php">
             <button class="bg-black text-white text-sm px-4 py-2 rounded-md hover:opacity-70 transition-all">
               Connect Google Integration
             </button>
