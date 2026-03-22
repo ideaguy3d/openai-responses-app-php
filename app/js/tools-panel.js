@@ -13,6 +13,12 @@ const DEFAULT_TOOLS_STATE = {
     mcpConfig: { server_label: '', server_url: '', allowed_tools: '', skip_approval: true },
 };
 
+function appUrl(path) {
+    const basePath = (window.APP_BASE_PATH || '').replace(/\/$/, '');
+    const normalizedPath = path.replace(/^\/+/, '');
+    return basePath ? `${basePath}/${normalizedPath}` : `/${normalizedPath}`;
+}
+
 function loadToolsState() {
     return JSON.parse(localStorage.getItem('toolsState') || JSON.stringify(DEFAULT_TOOLS_STATE));
 }
@@ -96,7 +102,7 @@ async function addVectorStore() {
     if (!storeId) return;
 
     try {
-        const res = await fetch('/api/vector_stores/retrieve_store.php?vector_store_id=' + encodeURIComponent(storeId));
+        const res = await fetch(appUrl('api/vector_stores/retrieve_store.php?vector_store_id=' + encodeURIComponent(storeId)));
         const data = await res.json();
         if (data.id) {
             const state = loadToolsState();
@@ -140,7 +146,7 @@ async function handleFileUpload(input) {
         const base64Content = btoa(binary);
 
         // 1. Upload file to OpenAI
-        const uploadRes = await fetch('/api/vector_stores/upload_file.php', {
+        const uploadRes = await fetch(appUrl('api/vector_stores/upload_file.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileObject: { name: file.name, content: base64Content } }),
@@ -153,7 +159,7 @@ async function handleFileUpload(input) {
         let vectorStoreId = state.vectorStore?.id;
 
         if (!vectorStoreId) {
-            const createRes = await fetch('/api/vector_stores/create_store.php', {
+            const createRes = await fetch(appUrl('api/vector_stores/create_store.php'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: 'Default store' }),
@@ -166,13 +172,15 @@ async function handleFileUpload(input) {
         }
 
         // 3. Add file to vector store
-        await fetch('/api/vector_stores/add_file.php', {
+        await fetch(appUrl('api/vector_stores/add_file.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileId: uploadData.id, vectorStoreId }),
         });
 
-        statusEl.textContent = 'Uploaded ' + file.name + ' successfully!';
+        statusEl.textContent = file.type.startsWith('image/')
+            ? 'Uploaded ' + file.name + ', but file search will not analyze image contents.'
+            : 'Uploaded ' + file.name + ' successfully!';
         setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
     } catch (err) {
         statusEl.textContent = 'Error uploading file. Please try again.';
@@ -184,11 +192,21 @@ async function handleFileUpload(input) {
 
 // ---- Web Search Config ----
 function updateWebSearchConfig() {
+    let country = (document.getElementById('ws-country')?.value || '').trim();
+    if (country.toLowerCase() === 'usa' || country.toLowerCase() === 'united states') {
+        country = 'US';
+    } else {
+        country = country.toUpperCase();
+    }
+    if (document.getElementById('ws-country')) {
+        document.getElementById('ws-country').value = country;
+    }
+
     const state = loadToolsState();
     state.webSearchConfig = {
         user_location: {
             type: 'approximate',
-            country: document.getElementById('ws-country')?.value || '',
+            country: country,
             region: document.getElementById('ws-region')?.value || '',
             city: document.getElementById('ws-city')?.value || '',
         },
@@ -226,7 +244,7 @@ function clearMcpConfig() {
 // ---- Google Integration ----
 async function checkGoogleStatus() {
     try {
-        const res = await fetch('/api/google/status.php');
+        const res = await fetch(appUrl('api/google/status.php'));
         const data = await res.json();
         const toggle = document.getElementById('google-toggle');
 
