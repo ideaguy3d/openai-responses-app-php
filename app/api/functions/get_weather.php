@@ -2,44 +2,61 @@
 // public/api/functions/get_weather.php
 header('Content-Type: application/json');
 
+function respond_with_error(string $message, int $status = 502): void {
+    http_response_code($status);
+    echo json_encode(['error' => $message]);
+    exit;
+}
+
 $location = $_GET['location'] ?? '';
 $unit = $_GET['unit'] ?? 'celsius';
 
 if (!$location) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Missing location']);
-    exit;
+    respond_with_error('Missing location', 400);
 }
 
 // 1. Geocode the location
-$geoUrl = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
-    'q' => $location, 
-    'format' => 'json'
+$geoUrl = 'https://geocoding-api.open-meteo.com/v1/search?' . http_build_query([
+    'name' => $location,
+    'count' => 1,
+    'language' => 'en',
+    'format' => 'json',
 ]);
-$geoData = json_decode(file_get_contents($geoUrl), true);
-
-if (empty($geoData)) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Invalid location']);
-    exit;
+$geoResponse = @file_get_contents($geoUrl);
+if ($geoResponse === false) {
+    respond_with_error('Geocoding failed');
 }
 
-$lat = $geoData[0]['lat'];
-$lon = $geoData[0]['lon'];
+$geoData = json_decode($geoResponse, true);
+if (empty($geoData['results'][0]) || !is_array($geoData['results'][0])) {
+    respond_with_error('Invalid location', 404);
+}
+
+$lat = $geoData['results'][0]['latitude'];
+$lon = $geoData['results'][0]['longitude'];
 
 // 2. Fetch weather
 $weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude={$lat}&longitude={$lon}&hourly=temperature_2m&temperature_unit={$unit}";
-$weather = json_decode(file_get_contents($weatherUrl), true);
+$weatherResponse = @file_get_contents($weatherUrl);
+if ($weatherResponse === false) {
+    respond_with_error('Weather lookup failed');
+}
+
+$weather = json_decode($weatherResponse, true);
+$hourly = $weather['hourly'] ?? null;
+if (!is_array($hourly)) {
+    respond_with_error('Weather payload malformed');
+}
 
 // 3. Find current hour's temperature
 $currentHour = gmdate('Y-m-d\TH:00');
-$index = array_search($currentHour, $weather['hourly']['time']);
-$temp = ($index !== false) ? $weather['hourly']['temperature_2m'][$index] : null;
+$times = $hourly['time'] ?? [];
+$temperatures = $hourly['temperature_2m'] ?? [];
+$index = array_search($currentHour, $times, true);
+$temp = ($index !== false && isset($temperatures[$index])) ? $temperatures[$index] : null;
 
 if ($temp === null) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Temperature data unavailable']);
-    exit;
+    respond_with_error('Temperature data unavailable');
 }
 
 echo json_encode(['temperature' => $temp]);
