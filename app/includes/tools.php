@@ -1,5 +1,46 @@
 <?php
+
 // includes/tools.php
+
+function normalize_web_search_location(?array $loc): ?array {
+    if (!$loc) {
+        return null;
+    }
+
+    $country = strtoupper(trim((string) ($loc['country'] ?? '')));
+    $countryMap = [
+        'USA' => 'US',
+        'UNITED STATES' => 'US',
+        'UNITED STATES OF AMERICA' => 'US',
+        'UK' => 'GB',
+    ];
+    if (isset($countryMap[$country])) {
+        $country = $countryMap[$country];
+    }
+    if ($country !== '' && !preg_match('/^[A-Z]{2}$/', $country)) {
+        $country = '';
+    }
+
+    $normalized = [
+        'type' => 'approximate',
+    ];
+
+    if ($country !== '') {
+        $normalized['country'] = $country;
+    }
+
+    $city = trim((string) ($loc['city'] ?? ''));
+    $region = trim((string) ($loc['region'] ?? ''));
+
+    if ($city !== '') {
+        $normalized['city'] = $city;
+    }
+    if ($region !== '') {
+        $normalized['region'] = $region;
+    }
+
+    return count($normalized) > 1 ? $normalized : null;
+}
 
 function buildTools(array $toolsState): array {
     $tools = [];
@@ -7,8 +48,8 @@ function buildTools(array $toolsState): array {
     // Web Search
     if (!empty($toolsState['webSearchEnabled'])) {
         $webSearch = ['type' => 'web_search'];
-        $loc = $toolsState['webSearchConfig']['user_location'] ?? null;
-        if ($loc && ($loc['country'] || $loc['city'] || $loc['region'])) {
+        $loc = normalize_web_search_location($toolsState['webSearchConfig']['user_location'] ?? null);
+        if ($loc) {
             $webSearch['user_location'] = $loc;
         }
         $tools[] = $webSearch;
