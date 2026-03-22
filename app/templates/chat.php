@@ -5,7 +5,7 @@
       <div id="chat-messages" class="h-[90vh] overflow-y-scroll px-10 flex flex-col">
         <div class="mt-auto space-y-5 pt-4">
           <!-- Initial assistant message -->
-          <div class="text-sm text-stone-600">
+          <div class="max-w-none text-sm leading-7 text-stone-700">
             <?= htmlspecialchars(INITIAL_MESSAGE) ?>
           </div>
         </div>

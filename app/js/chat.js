@@ -8,6 +8,12 @@ const state = {
     isLoading: false,
 };
 
+function appUrl(path) {
+    const basePath = (window.APP_BASE_PATH || '').replace(/\/$/, '');
+    const normalizedPath = path.replace(/^\/+/, '');
+    return basePath ? `${basePath}/${normalizedPath}` : `/${normalizedPath}`;
+}
+
 // --- DOM references ---
 const chatMessages = document.getElementById('chat-messages');
 const chatInput = document.getElementById('chat-input');
@@ -50,7 +56,7 @@ async function sendMessage() {
     if (!message) return;
 
     chatInput.value = '';
-    sendButton.disabled = true;
+    setComposerDisabled(true);
 
     // Add user message to UI
     appendMessage('user', message);
@@ -74,7 +80,7 @@ async function processMessages() {
     const toolsState = getToolsState();
 
     try {
-        const response = await fetch('/api/turn_response.php', {
+        const response = await fetch(appUrl('api/turn_response.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -85,7 +91,16 @@ async function processMessages() {
 
         if (!response.ok) {
             console.error('API error:', response.status);
+            appendErrorMessage('API error: ' + response.status);
             showLoading(false);
+            setComposerDisabled(false);
+            return;
+        }
+
+        if (!response.body) {
+            appendErrorMessage('The response stream was empty.');
+            showLoading(false);
+            setComposerDisabled(false);
             return;
         }
 
@@ -109,7 +124,14 @@ async function processMessages() {
                 const dataStr = line.slice(6);
                 if (dataStr === '[DONE]') break;
 
-                const { event, data } = JSON.parse(dataStr);
+                let eventPayload;
+                try {
+                    eventPayload = JSON.parse(dataStr);
+                } catch (error) {
+                    console.error('Invalid SSE payload:', dataStr, error);
+                    continue;
+                }
+                const { event, data } = eventPayload;
                 
                 switch (event) {
                     case 'response.output_text.delta': {
@@ -121,7 +143,7 @@ async function processMessages() {
                         if (!assistantEl) {
                             assistantEl = appendMessage('assistant', '');
                         }
-                        assistantEl.textContent = assistantText;
+                        assistantEl.innerHTML = renderAssistantHtml(assistantText);
                         scrollToBottom();
                         break;
                     }
@@ -145,11 +167,9 @@ async function processMessages() {
                         const item = data.item;
                         if (!item) break;
 
-                        // Add to conversation history
-                        state.conversationItems.push(item);
-
                         // If it's a function call, execute it and loop
                         if (item.type === 'function_call') {
+                            state.conversationItems.push(item);
                             const result = await executeFunction(item.name, item.arguments);
                             updateToolCall(item.id, 'Completed');
 
@@ -171,9 +191,31 @@ async function processMessages() {
 
                         // Mark other tool calls as completed
                         if (item.type === 'web_search_call' || item.type === 'file_search_call') {
+                            state.conversationItems.push(item);
                             updateToolCall(item.id, 'Completed');
+                        } else if (item.type === 'message') {
+                            state.conversationItems.push(item);
+                            if (!assistantText) {
+                                const messageText = extractOutputText(item);
+                                if (messageText) {
+                                    assistantText = messageText;
+                                    if (!assistantEl) {
+                                        assistantEl = appendMessage('assistant', messageText);
+                                    }
+                                }
+                            }
                         }
                         break;
+                    }
+
+                    case 'error':
+                    case 'response.failed':
+                    case 'response.incomplete': {
+                        const errorMessage = data?.message || data?.error?.message || 'The response failed before completion.';
+                        appendErrorMessage(errorMessage);
+                        showLoading(false);
+                        setComposerDisabled(false);
+                        return;
                     }
 
                     case 'response.completed': {
@@ -184,19 +226,13 @@ async function processMessages() {
             }
         }
 
-        // Add completed assistant message to conversation history
-        if (assistantText) {
-            state.conversationItems.push({
-                role: 'assistant',
-                content: [{ type: 'output_text', text: assistantText }],
-            });
-        }
-
     } catch (error) {
         console.error('Error processing messages:', error);
+        appendErrorMessage(error.message || 'Error processing messages.');
     }
 
     showLoading(false);
+    setComposerDisabled(false);
 }
 
 
@@ -207,12 +243,12 @@ async function executeFunction(name, argsJson) {
     switch (name) {
         case 'get_weather': {
             const params = new URLSearchParams({ location: args.location, unit: args.unit });
-            const res = await fetch('/api/functions/get_weather.php?' + params);
-            return await res.json();
+            const res = await fetch(appUrl('api/functions/get_weather.php?' + params));
+            return parseJsonResponse(res, 'Weather request failed');
         }
         case 'get_joke': {
-            const res = await fetch('/api/functions/get_joke.php');
-            return await res.json();
+            const res = await fetch(appUrl('api/functions/get_joke.php'));
+            return parseJsonResponse(res, 'Joke request failed');
         }
         default:
             return { error: 'Unknown function: ' + name };
@@ -231,8 +267,8 @@ function appendMessage(role, text) {
             <p class="text-sm">${escapeHtml(text)}</p>
         </div>`;
     } else {
-        div.className = 'text-sm text-stone-600';
-        div.textContent = text;
+        div.className = 'max-w-none text-sm leading-7 text-stone-700';
+        div.innerHTML = renderAssistantHtml(text);
     }
 
     container.appendChild(div);
@@ -248,6 +284,11 @@ function appendToolCall(name, status, id) {
     div.innerHTML = `<span class="animate-pulse">&#9679;</span> ${escapeHtml(name)}: ${escapeHtml(status)}`;
     container.appendChild(div);
     scrollToBottom();
+}
+
+function appendErrorMessage(message) {
+    const text = typeof message === 'string' ? message : 'Something went wrong.';
+    appendMessage('assistant', 'Error: ' + text);
 }
 
 function updateToolCall(id, status) {
@@ -282,4 +323,75 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function renderAssistantHtml(text) {
+    if (!text) {
+        return '';
+    }
+
+    const blocks = text.trim().split(/\n\s*\n/);
+    return blocks.map(renderAssistantBlock).join('');
+}
+
+function renderAssistantBlock(block) {
+    const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
+    if (!lines.length) {
+        return '';
+    }
+
+    if (lines.every(line => /^[-*]\s+/.test(line))) {
+        const items = lines
+            .map(line => line.replace(/^[-*]\s+/, ''))
+            .map(item => `<li class="ml-5 list-disc pl-1">${renderInlineFormatting(item)}</li>`)
+            .join('');
+        return `<ul class="my-3 space-y-2">${items}</ul>`;
+    }
+
+    if (lines.every(line => /^\d+\.\s+/.test(line))) {
+        const items = lines
+            .map(line => line.replace(/^\d+\.\s+/, ''))
+            .map(item => `<li class="ml-5 list-decimal pl-1">${renderInlineFormatting(item)}</li>`)
+            .join('');
+        return `<ol class="my-3 space-y-2">${items}</ol>`;
+    }
+
+    return `<p class="my-3">${lines.map(renderInlineFormatting).join('<br>')}</p>`;
+}
+
+function renderInlineFormatting(text) {
+    let html = escapeHtml(text);
+
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-stone-900">$1</strong>');
+    html = html.replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-sky-700 underline decoration-sky-300 underline-offset-2">$1</a>');
+
+    return html;
+}
+
+function extractOutputText(item) {
+    if (!Array.isArray(item.content)) return '';
+    return item.content
+        .filter(part => part.type === 'output_text' && typeof part.text === 'string')
+        .map(part => part.text)
+        .join('');
+}
+
+async function parseJsonResponse(response, fallbackMessage) {
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (error) {
+        return { error: fallbackMessage };
+    }
+
+    if (!response.ok) {
+        return { error: data?.error || fallbackMessage };
+    }
+
+    return data;
+}
+
+function setComposerDisabled(disabled) {
+    chatInput.disabled = disabled;
+    sendButton.disabled = disabled || !chatInput.value.trim();
 }
