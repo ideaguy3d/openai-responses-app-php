@@ -1,6 +1,6 @@
 <?php
 
-require_once dirname(__DIR__, 3) . '/includes/config.php';
+require_once __DIR__ . '/../../../config_response_starter.php';
 
 $fileId = $_GET['file_id'] ?? '';
 $containerId = $_GET['container_id'] ?? '';
